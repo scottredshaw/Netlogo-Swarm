@@ -3,13 +3,16 @@ breed [social_agents social_agent]
 breed [relay_agents relay_agent]
 breed [objects object]
 
+breed [hqs hq]
+
+
 patches-own [
   obstacles
-  hq
 ]
 
 turtles-own[
   holding_obj
+  target
 ]
 
 to setup
@@ -21,25 +24,32 @@ end
 
 to setup-patches
   ask patches
-  [ setup-hq
-    setup-obstacles
+  [setup-obstacles
   color-patch ]
 end
 
 
 to setup-agents
   ; setting agents to spawn in at the HQ - bottom midde of the world
+  create-hqs 1[
+    set shape "square"
+    setxy 0 (min-pycor + 2)
+    set color pink
+  ]
   create-antisocial_agents num-antisocial-agents [
     set color green
     setxy 0 (min-pycor + 2)
+    set target one-of hqs
   ]
   create-social_agents num-social-agents [
     set color blue
     setxy 0 (min-pycor + 2)
+    set target one-of hqs
   ]
   create-relay_agents num-relay-agents [
     set color red
     setxy 0 (min-pycor + 2)
+    set target one-of hqs
   ]
   create-objects 8 [
     ; check that circle is not on the same as patch as an obstacle
@@ -47,11 +57,13 @@ to setup-agents
     setxy  random max-pxcor random max-pycor
     set shape "circle"
   ]
+
 end
 
-to setup-hq
-  set hq (distancexy 0 (min-pycor + 2)) < 2
-end
+;to setup-hq
+  ;set hq (distancexy 0 (min-pycor + 2)) < 2
+;  set shape "square"
+;end
 
 to setup-obstacles
   ; specific coordinate range
@@ -69,8 +81,8 @@ to setup-obstacles
 end
 
 to color-patch
-  if hq
-  [ set pcolor grey ]
+  ;if hq
+  ;[ set pcolor grey ]
   if obstacles
   [ set pcolor turquoise]
 end
@@ -101,29 +113,62 @@ to go
       ; need to create clever algorihtm to avoid obstacles and not just turn left or right
       ; but turn left or right in relation to where the obstacle is
     ]
-
     if any? turtles with [shape = "circle"] in-cone 3 90 [
       ; make turtle move toward this object by using its coordinates but make it natural and
       ; uses forward and turning and stuff like that
       print "trying to collect"
       collect_obj
     ]
-    random_walk
+    ifelse holding_obj = 1 [
+      print "Returning to the HQ"
+      print distance target
+      face target
+      ; For when the agent is at the hq
+      if distance target = 0
+        [ set holding_obj 0
+          face patch  0 0
+          random_walk
+          let this_agent self
+          ask objects-here [
+            die
+          ]
+         ]
+
+      ifelse distance target < 1
+        [ move-to target ]
+        [ fd 1 ]
+    ]
+    [ random_walk ]
   ]
+  ;tick
 end
 
 to collect_obj
-  ; if object is in view then
+  ; this would only work
+  move-to min-one-of objects [distance myself]
   let this_agent self
+  ; need to do this when it is on top of it
+  ; when it is on top of it stop
   ask objects-here [
-    create-links-from this_agent [tie]
+    set color red
+    create-links-with antisocial_agents in-radius 1 [
+      tie
+      set color white
+    ]
   ]
-  fd 8
-  ; create-links-from antisocial_agent [tie]
+  set holding_obj 1
+  ;returning_hq
+end
+
+to returning_hq
+  print "Returning to the HQ"
+  facexy 0 18
+  move-to target
+  ;fd 8
 end
 
 to random_walk
-   rt random 360               ; set random heading
+   rt random 360
    fd random 3
 end
 
