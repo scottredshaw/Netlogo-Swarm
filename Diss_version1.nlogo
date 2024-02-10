@@ -13,6 +13,13 @@ patches-own [
 turtles-own[
   holding_obj
   target
+  holding_obj_cor
+  info_obj_cor
+  mapping
+]
+
+globals [
+  _
 ]
 
 to setup
@@ -26,6 +33,11 @@ to setup-patches
   ask patches
   [setup-obstacles
   color-patch ]
+  ask patches with [
+    pxcor = max-pxcor or
+    pxcor = min-pxcor or
+    pycor = max-pycor or
+    pycor = min-pycor][ set pcolor turquoise]
 end
 
 
@@ -33,28 +45,34 @@ to setup-agents
   ; setting agents to spawn in at the HQ - bottom midde of the world
   create-hqs 1[
     set shape "square"
-    setxy 0 (min-pycor + 2)
+    setxy 0 (min-pycor + 3)
     set color pink
   ]
   create-antisocial_agents num-antisocial-agents [
     set color green
-    setxy 0 (min-pycor + 2)
+    setxy 0 (min-pycor + 3)
     set target one-of hqs
   ]
   create-social_agents num-social-agents [
     set color blue
-    setxy 0 (min-pycor + 2)
+    setxy 0 (min-pycor + 3)
     set target one-of hqs
+    facexy min-pxcor (min-pycor + 3)
   ]
   create-relay_agents num-relay-agents [
     set color red
-    setxy 0 (min-pycor + 2)
+    setxy 0 (min-pycor + 3)
     set target one-of hqs
   ]
   create-objects 8 [
     ; check that circle is not on the same as patch as an obstacle
     set color orange
-    setxy  random max-pxcor random max-pycor
+    let x random max-pxcor
+    let y random max-pycor
+    while [[pcolor] of patch x y = turquoise]
+      [set x random max-pxcor
+       set y random max-pycor]
+    setxy x y
     set shape "circle"
   ]
 
@@ -77,7 +95,7 @@ to setup-obstacles
   ; Chnage functionality to allow for a specified number of obstacles
 
 
-  set obstacles (distancexy random-xcor (random max-pycor)) < 2
+  set obstacles (distancexy random-xcor (random (max-pycor ))) < 2
 end
 
 to color-patch
@@ -89,31 +107,14 @@ end
 
 
 to go
+  let initial 0
   ask antisocial_agents [
     ;ifelse any? antisocial_agents in-radius 5 with [ obstacles ][
     ; this works
-    if any? patches with [pcolor = turquoise] in-cone 3 90 [
-    ; need to find what direction it is in
-    ; only detects if it goes over it
-    ; prints the patch and the coordinates (patch 10 3)
-    ; nobody when there patch left right or ahead is off the screen
-      if patch-left-and-ahead 45 3 != Nobody and [pcolor] of patch-left-and-ahead 45 3 = turquoise [
-        print patch-left-and-ahead 45 3
-        ;set pcolor blue
-        turning_right
-      ]
-      if patch-right-and-ahead 45 3 != Nobody and [pcolor] of patch-right-and-ahead 45 3 = turquoise [
-        print patch-right-and-ahead 45 3
-        ;set pcolor red
-        turning_left
-      ]
-      ; use this to see where the patch is
-      ;patch-left-and-ahead angle distance
-      ;patch-right-and-ahead angle distance
-      ; need to create clever algorihtm to avoid obstacles and not just turn left or right
-      ; but turn left or right in relation to where the obstacle is
+    if any? patches with [pcolor = turquoise] in-cone 2 180 [
+      collision_avoidance_2
     ]
-    if any? turtles with [shape = "circle"] in-cone 3 90 [
+    if any? turtles with [shape = "circle"] in-cone 2 90 [
       ; make turtle move toward this object by using its coordinates but make it natural and
       ; uses forward and turning and stuff like that
       print "trying to collect"
@@ -122,25 +123,86 @@ to go
     ifelse holding_obj = 1 [
       print "Returning to the HQ"
       print distance target
-      face target
-      ; For when the agent is at the hq
-      if distance target = 0
-        [ set holding_obj 0
-          face patch  0 0
-          random_walk
-          let this_agent self
-          ask objects-here [
-            die
-          ]
-         ]
-
-      ifelse distance target < 1
-        [ move-to target ]
-        [ fd 1 ]
+      returning_hq
     ]
-    [ random_walk ]
+    [ facexy 0 0
+      random_walk ]
+  ]
+
+  ask social_agents [
+
+    ; works fine at the start and it goes around in loops but when it come back then the angle
+    ; it starts again is not good
+
+    ; 1) create a lead agent
+    ; 2) goes on the left most coordinate
+    ; - go left till u hit a wall then go right
+    ; 3) follows that up side
+    ; 4) has collision avoidance
+    ; 5) when detects a wall turn right
+
+    ;solution 2
+    ;if any? patches with [pcolor = turquoise] in-cone 2 180 [
+    ;  collision_avoidance_2
+    ;]
+
+    if any? turtles with [shape = "circle"] in-cone 2 90 [
+      ; make turtle move toward this object by using its coordinates but make it natural and
+      ; uses forward and turning and stuff like that
+      print "trying to collect"
+      collect_obj
+    ]
+    ifelse holding_obj = 1 [
+      returning_hq
+    ]
+    [lhs]
+
+
+
+  ]
+  ask relay_agents [
+    ; relay agents will move around a certain area in relation to the hq
+    ; it will be used to transfer and transmit data from the hq to upper middle of the environment
+    ; each agent will move in a spiral motion
+
+    ; loiter around the middle of the environment and stayw within a range of the middle 40 percent
+    ; keeps track of information given via the other agents
+    ; goes back to hq to return some data so the hq can store some data
+
+    ; go forward till middle then even split due to the number of agents
+    ; holding_obj_cor
+    ; info_obj_cor
+    facexy 0 0
+    if not ( pycor > 5 and pycor < 20) [
+      ; face should depend on how many relay nodes there
+      fd 1
+    ]
   ]
   ;tick
+end
+
+to lhs
+  ;; turn right if necessary
+    if not wall? (-90) and wall? (-135) [
+      rt -90
+    ]
+    ;; turn left if necessary (sometimes more than once)
+    while [wall? 0] [
+      lt -90
+    ]
+    ;; move forward
+    fd 1
+end
+
+; cite this work
+to-report wall? [angle]  ;; turtle procedure
+  ;; note that angle may be positive or negative.  if angle is
+  ;; positive, the turtle looks right.  if angle is negative,
+  ;; the turtle looks left.
+  if patch-right-and-ahead angle 1 != Nobody [
+    report turquoise = [pcolor] of patch-right-and-ahead angle 1
+  ]
+  report false
 end
 
 to collect_obj
@@ -151,7 +213,8 @@ to collect_obj
   ; when it is on top of it stop
   ask objects-here [
     set color red
-    create-links-with antisocial_agents in-radius 1 [
+    let agent_type [ breed ] of this_agent
+    create-links-with agent_type in-radius 1 [
       tie
       set color white
     ]
@@ -160,28 +223,95 @@ to collect_obj
   ;returning_hq
 end
 
+to collision_avoidance
+  if any? patches with [pcolor = turquoise] in-cone 2 180 [
+    ; need to find what direction it is in
+    ; only detects if it goes over it
+    ; prints the patch and the coordinates (patch 10 3)
+    ; nobody when there patch left right or ahead is off the screen
+      if patch-left-and-ahead 90 2 != Nobody and [pcolor] of patch-left-and-ahead 90 2 = turquoise [
+        ; print patch-left-and-ahead 45 3
+        ;set pcolor blue
+        turning_right
+      ]
+      if patch-right-and-ahead 90 2 != Nobody and [pcolor] of patch-right-and-ahead 90 2 = turquoise [
+        ; print patch-right-and-ahead 90 2
+        ;set pcolor red
+        turning_left
+      ]
+      ; use this to see where the patch is
+      ;patch-left-and-ahead angle distance
+      ;patch-right-and-ahead angle distance
+      ; need to create clever algorihtm to avoid obstacles and not just turn left or right
+      ; but turn left or right in relation to where the obstacle is
+    ]
+end
+
+; need to tailor the new collision avoidance so it works like the social agents around the green
+to collision_avoidance_2
+  show wall? -90
+
+  if not wall? (-90) and wall? (-135) [
+     rt -90
+  ]
+   ;; turn left if necessary (sometimes more than once)
+  while [wall? 0] [
+    lt -90
+  ]
+  ;; move forward
+  fd 1
+end
+
 to returning_hq
   print "Returning to the HQ"
-  facexy 0 18
-  move-to target
-  ;fd 8
+  print distance target
+  face target
+  ; let agent_type self
+  ; print [breed] of this_agent
+  ; For when the agent is at the hq
+  if distance target = 0 [
+    if breed = antisocial_agents [
+      set holding_obj 0
+      face patch 0 0
+      random_walk
+      ; let this_agent self
+      ask objects-here [
+        die
+      ]
+    ]
+    if breed = social_agents [
+      print "social_agent"
+      set holding_obj 0
+      face patch min-pxcor (min-pycor + 3)
+      let this_agent self
+      ask objects-here [
+        die
+      ]
+    ]
+  ]
+
+  ifelse distance target < 1
+    [ move-to target ]
+    [ collision_avoidance_2
+      fd 1 ]
 end
+
 
 to random_walk
    rt random 360
-   fd random 3
+   fd random 1.5
 end
 
 to turning_right
-  print "turning right"
+  ; print "turning right"
   rt 90
-  fd 1
+  fd 0.5
 end
 
 to turning_left
-  print "turning left"
+  ; print "turning left"
   rt -90
-  fd 1
+  fd 0.5
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
@@ -254,7 +384,7 @@ num-antisocial-agents
 num-antisocial-agents
 0
 50
-2.0
+1.0
 1
 1
 NIL
@@ -269,7 +399,7 @@ num-social-agents
 num-social-agents
 0
 50
-2.0
+1.0
 1
 1
 NIL
