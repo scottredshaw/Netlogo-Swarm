@@ -5,7 +5,6 @@ breed [objects object]
 
 breed [hqs hq]
 
-
 patches-own [
   obstacles
 ]
@@ -47,22 +46,26 @@ to setup-agents
     set shape "square"
     setxy 0 (min-pycor + 3)
     set color pink
+    set info_obj_cor []
   ]
   create-antisocial_agents num-antisocial-agents [
     set color green
     setxy 0 (min-pycor + 3)
     set target one-of hqs
+    set info_obj_cor []
   ]
   create-social_agents num-social-agents [
     set color blue
     setxy 0 (min-pycor + 3)
     set target one-of hqs
     facexy min-pxcor (min-pycor + 3)
+    set info_obj_cor []
   ]
   create-relay_agents num-relay-agents [
     set color red
     setxy 0 (min-pycor + 3)
     set target one-of hqs
+    set info_obj_cor []
   ]
   create-objects 8 [
     ; check that circle is not on the same as patch as an obstacle
@@ -78,10 +81,7 @@ to setup-agents
 
 end
 
-;to setup-hq
-  ;set hq (distancexy 0 (min-pycor + 2)) < 2
-;  set shape "square"
-;end
+
 
 to setup-obstacles
   ; specific coordinate range
@@ -93,14 +93,17 @@ to setup-obstacles
   ;]
 
   ; Chnage functionality to allow for a specified number of obstacles
+  let x random max-pxcor
+  let y random max-pycor
+  ; let counter 10
 
-
-  set obstacles (distancexy random-xcor (random (max-pycor ))) < 2
+  ; while counter != 0 [
+  ;  set obstacles (
+  ;]
+  set obstacles (distancexy random-xcor (random (max-pycor - 1 ))) < 4
 end
 
 to color-patch
-  ;if hq
-  ;[ set pcolor grey ]
   if obstacles
   [ set pcolor turquoise]
 end
@@ -109,31 +112,30 @@ end
 to go
   let initial 0
   ask antisocial_agents [
-    ;ifelse any? antisocial_agents in-radius 5 with [ obstacles ][
-    ; this works
-    if any? patches with [pcolor = turquoise] in-cone 2 180 [
-      collision_avoidance_2
-    ]
-    if any? turtles with [shape = "circle"] in-cone 2 90 [
+    print "antisocial"
+    ; print who
+    ; print info_obj_cor
+
+    if any? turtles with [shape = "circle"] in-cone 2 90 and holding_obj = 0 [
       ; make turtle move toward this object by using its coordinates but make it natural and
       ; uses forward and turning and stuff like that
-      print "trying to collect"
+      ; print "trying to collect"
       collect_obj
     ]
+
     ifelse holding_obj = 1 [
-      print "Returning to the HQ"
-      print distance target
+      print "holding object"
+      ; print distance target
+      if any? antisocial_agents in-radius 3 or any? relay_agents in-radius 3 [
+        communication_pulse 3
+      ]
       returning_hq
     ]
     [ facexy 0 0
-      random_walk ]
+      weighted_random_walk ]
   ]
 
   ask social_agents [
-
-    ; works fine at the start and it goes around in loops but when it come back then the angle
-    ; it starts again is not good
-
     ; 1) create a lead agent
     ; 2) goes on the left most coordinate
     ; - go left till u hit a wall then go right
@@ -141,26 +143,31 @@ to go
     ; 4) has collision avoidance
     ; 5) when detects a wall turn right
 
-    ;solution 2
-    ;if any? patches with [pcolor = turquoise] in-cone 2 180 [
-    ;  collision_avoidance_2
-    ;]
+    if num-social-agents > 0 [
+      if who = 1 [lhs]
+      if who = 2 [fd 1]
+      create-links-with other social_agents
+    ]
 
-    if any? turtles with [shape = "circle"] in-cone 2 90 [
+    if any? turtles with [shape = "circle"] in-cone 2 90 and holding_obj = 0 [
       ; make turtle move toward this object by using its coordinates but make it natural and
       ; uses forward and turning and stuff like that
-      print "trying to collect"
       collect_obj
     ]
     ifelse holding_obj = 1 [
       returning_hq
+      print "holding object"
+      if any? antisocial_agents in-radius 3 [
+        communication_pulse 3
+      ]
     ]
     [lhs]
 
-
-
   ]
   ask relay_agents [
+    print "relay"
+    ; print who
+    ; print info_obj_cor
     ; relay agents will move around a certain area in relation to the hq
     ; it will be used to transfer and transmit data from the hq to upper middle of the environment
     ; each agent will move in a spiral motion
@@ -177,17 +184,21 @@ to go
       ; face should depend on how many relay nodes there
       fd 1
     ]
+    if any? antisocial_agents in-radius 7 [
+      print "com_pulse"
+      communication_pulse 7
+      ]
   ]
   ;tick
 end
 
 to lhs
   ;; turn right if necessary
-    if not wall? (-90) and wall? (-135) [
+    if not wall? (-90) 1 and wall? (-135) 1 [
       rt -90
     ]
     ;; turn left if necessary (sometimes more than once)
-    while [wall? 0] [
+    while [wall? 0 1] [
       lt -90
     ]
     ;; move forward
@@ -195,7 +206,7 @@ to lhs
 end
 
 ; cite this work
-to-report wall? [angle]  ;; turtle procedure
+to-report wall? [angle dis]  ;; turtle procedure
   ;; note that angle may be positive or negative.  if angle is
   ;; positive, the turtle looks right.  if angle is negative,
   ;; the turtle looks left.
@@ -219,52 +230,26 @@ to collect_obj
       set color white
     ]
   ]
+  set holding_obj_cor list pxcor pycor
   set holding_obj 1
+
+  print holding_obj_cor
   ;returning_hq
 end
 
-to collision_avoidance
-  if any? patches with [pcolor = turquoise] in-cone 2 180 [
-    ; need to find what direction it is in
-    ; only detects if it goes over it
-    ; prints the patch and the coordinates (patch 10 3)
-    ; nobody when there patch left right or ahead is off the screen
-      if patch-left-and-ahead 90 2 != Nobody and [pcolor] of patch-left-and-ahead 90 2 = turquoise [
-        ; print patch-left-and-ahead 45 3
-        ;set pcolor blue
-        turning_right
-      ]
-      if patch-right-and-ahead 90 2 != Nobody and [pcolor] of patch-right-and-ahead 90 2 = turquoise [
-        ; print patch-right-and-ahead 90 2
-        ;set pcolor red
-        turning_left
-      ]
-      ; use this to see where the patch is
-      ;patch-left-and-ahead angle distance
-      ;patch-right-and-ahead angle distance
-      ; need to create clever algorihtm to avoid obstacles and not just turn left or right
-      ; but turn left or right in relation to where the obstacle is
-    ]
-end
-
 ; need to tailor the new collision avoidance so it works like the social agents around the green
-to collision_avoidance_2
-  show wall? -90
-
-  if not wall? (-90) and wall? (-135) [
-     rt -90
-  ]
+to collision_avoidance
+  show wall? 0 1
    ;; turn left if necessary (sometimes more than once)
-  while [wall? 0] [
-    lt -90
+  while [wall? 0 1] [
+    lt 90
   ]
   ;; move forward
   fd 1
 end
 
 to returning_hq
-  print "Returning to the HQ"
-  print distance target
+  ; print "Returning to the HQ"
   face target
   ; let agent_type self
   ; print [breed] of this_agent
@@ -280,7 +265,7 @@ to returning_hq
       ]
     ]
     if breed = social_agents [
-      print "social_agent"
+      ; print "social_agent"
       set holding_obj 0
       face patch min-pxcor (min-pycor + 3)
       let this_agent self
@@ -292,14 +277,89 @@ to returning_hq
 
   ifelse distance target < 1
     [ move-to target ]
-    [ collision_avoidance_2
+    [ collision_avoidance
       fd 1 ]
+end
+
+to communication_pulse [r]
+  ; if other agent is in range then send data of collected object
+  ;this agent in range
+  let self_obj_cor holding_obj_cor
+  ; print holding_obj_cor
+  if any? antisocial_agents in-radius r [
+    ask antisocial_agents in-radius r [
+      if self_obj_cor != 0 [
+        if not member? self_obj_cor info_obj_cor[ set info_obj_cor lput self_obj_cor info_obj_cor ]
+        ;print "anti_yay"
+        ;print who
+        ;print info_obj_cor
+      ]
+    ]
+  ]
+  if any? relay_agents in-radius r [
+    ask relay_agents in-radius r [
+      if self_obj_cor != 0 [
+        if not member? self_obj_cor info_obj_cor[ set info_obj_cor lput self_obj_cor info_obj_cor ]
+        ;print "relay_yay"
+        ;print who
+        ;print info_obj_cor
+      ]
+    ]
+  ]
 end
 
 
 to random_walk
-   rt random 360
-   fd random 1.5
+  let rotate random 360
+  let rand_dis random 1.5
+  if not wall? rotate rand_dis [
+    rt rotate
+    fd rand_dis
+  ]
+end
+
+to-report average_obj_cor
+  let xlist []
+  let ylist []
+  if is-list? info_obj_cor [
+    if length info_obj_cor > 1 [
+      ;foreach info_obj_cor [x -> set xlist item 0 x]
+      ;foreach info_obj_cor [x -> set ylist item 1 x]
+      ;foreach info_obj_cor [x -> insert-item xlist 0 x]
+      ;foreach info_obj_cor [x -> set ylist item 1 x]
+      ;print xlist
+      ;print ylist
+      ;report list mean xlist mean ylist
+
+      set xlist map [x -> item 0 x] info_obj_cor
+      set ylist map [x -> item 1 x] info_obj_cor
+
+      report list mean xlist mean ylist
+    ]
+  ]
+  report []
+end
+
+to weighted_random_walk
+  let avg_obj_cor average_obj_cor
+  print avg_obj_cor
+  if length avg_obj_cor > 1[
+    if item 0 avg_obj_cor < 0 and pxcor > item 0 avg_obj_cor or item 0 avg_obj_cor > 0 and pxcor < item 0 avg_obj_cor[
+      if pycor < item 1 avg_obj_cor[
+        let weighted_choice random 3
+        if weighted_choice = 2 [
+          print "weighted movement"
+          let rand_dis random 1.5
+          facexy item 0 avg_obj_cor item 1 avg_obj_cor
+          fd rand_dis
+        ]
+        if weighted_choice != 2[
+          random_walk
+        ]
+      ]
+    ]
+  ]
+  random_walk
 end
 
 to turning_right
@@ -384,7 +444,7 @@ num-antisocial-agents
 num-antisocial-agents
 0
 50
-1.0
+2.0
 1
 1
 NIL
