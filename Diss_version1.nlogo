@@ -14,8 +14,16 @@ turtles-own[
   target
   holding_obj_cor
   info_obj_cor
-  mapping
 ]
+
+relay_agents-own[
+  starting_cor
+]
+
+antisocial_agents-own[]
+
+social_agents-own[]
+
 
 globals [
   _
@@ -66,6 +74,7 @@ to setup-agents
     setxy 0 (min-pycor + 3)
     set target one-of hqs
     set info_obj_cor []
+    set starting_cor []
   ]
   create-objects 8 [
     ; check that circle is not on the same as patch as an obstacle
@@ -100,7 +109,7 @@ to setup-obstacles
   ; while counter != 0 [
   ;  set obstacles (
   ;]
-  set obstacles (distancexy random-xcor (random (max-pycor - 1 ))) < 4
+  set obstacles (distancexy random-xcor (random (max-pycor - 1 ))) < 3
 end
 
 to color-patch
@@ -179,9 +188,40 @@ to go
     ; go forward till middle then even split due to the number of agents
     ; holding_obj_cor
     ; info_obj_cor
-    facexy 0 0
-    if not ( pycor > 5 and pycor < 20) [
-      ; face should depend on how many relay nodes there
+    ;if num-relay-agents > 3[
+
+    ;]
+    let num_other_nodes num-antisocial-agents + num-social-agents
+    print "who"
+    print (who - num_other_nodes)
+    if length starting_cor = 0 [
+      let x_cor 0
+      let y_cor 0
+      if num-relay-agents < 4[
+        let range_ycor max-pycor / 4
+        if (who - num_other_nodes) mod 3 = 0 [ set x_cor 10 ]
+        if (who - num_other_nodes) mod 3 = 2 [ set x_cor -10 ]
+        if (who - num_other_nodes) mod 3 = 1 [ set x_cor 1 ]
+
+        set y_cor random range_ycor
+
+        while [[pcolor] of patch x_cor y_cor = turquoise] [
+          set y_cor random range_ycor
+        ]
+        set starting_cor list x_cor y_cor
+      ]
+    ]
+    print "xcor"
+    print pxcor
+    print item 0 starting_cor
+
+    print "ycor"
+    print pycor
+    print item 1 starting_cor
+
+    if pycor != (item 1 starting_cor) or pxcor != (item 0 starting_cor) [
+      print "hello"
+      facexy item 0 starting_cor item 1 starting_cor
       fd 1
     ]
     if any? antisocial_agents in-radius 7 [
@@ -300,9 +340,6 @@ to communication_pulse [r]
     ask relay_agents in-radius r [
       if self_obj_cor != 0 [
         if not member? self_obj_cor info_obj_cor[ set info_obj_cor lput self_obj_cor info_obj_cor ]
-        ;print "relay_yay"
-        ;print who
-        ;print info_obj_cor
       ]
     ]
   ]
@@ -323,14 +360,6 @@ to-report average_obj_cor
   let ylist []
   if is-list? info_obj_cor [
     if length info_obj_cor > 1 [
-      ;foreach info_obj_cor [x -> set xlist item 0 x]
-      ;foreach info_obj_cor [x -> set ylist item 1 x]
-      ;foreach info_obj_cor [x -> insert-item xlist 0 x]
-      ;foreach info_obj_cor [x -> set ylist item 1 x]
-      ;print xlist
-      ;print ylist
-      ;report list mean xlist mean ylist
-
       set xlist map [x -> item 0 x] info_obj_cor
       set ylist map [x -> item 1 x] info_obj_cor
 
@@ -474,7 +503,7 @@ num-relay-agents
 num-relay-agents
 0
 50
-1.0
+3.0
 1
 1
 NIL
