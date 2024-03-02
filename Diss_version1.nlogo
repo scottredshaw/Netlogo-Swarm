@@ -122,6 +122,7 @@ to go
   let initial 0
   ask antisocial_agents [
     print "antisocial"
+    print info_obj_cor
     ; print who
     ; print info_obj_cor
 
@@ -166,7 +167,7 @@ to go
     ifelse holding_obj = 1 [
       returning_hq
       print "holding object"
-      if any? antisocial_agents in-radius 3 [
+      if any? antisocial_agents in-radius 3 or any? relay_agents in-radius 3 [
         communication_pulse 3
       ]
     ]
@@ -175,11 +176,8 @@ to go
   ]
   ask relay_agents [
     print "relay"
-    ; print who
-    ; print info_obj_cor
-    ; relay agents will move around a certain area in relation to the hq
-    ; it will be used to transfer and transmit data from the hq to upper middle of the environment
-    ; each agent will move in a spiral motion
+    print info_obj_cor
+    print starting_cor
 
     ; loiter around the middle of the environment and stayw within a range of the middle 40 percent
     ; keeps track of information given via the other agents
@@ -191,43 +189,29 @@ to go
     ;if num-relay-agents > 3[
 
     ;]
-    let num_other_nodes num-antisocial-agents + num-social-agents
-    print "who"
-    print (who - num_other_nodes)
     if length starting_cor = 0 [
-      let x_cor 0
-      let y_cor 0
-      if num-relay-agents < 4[
-        let range_ycor max-pycor / 4
-        if (who - num_other_nodes) mod 3 = 0 [ set x_cor 10 ]
-        if (who - num_other_nodes) mod 3 = 2 [ set x_cor -10 ]
-        if (who - num_other_nodes) mod 3 = 1 [ set x_cor 1 ]
-
-        set y_cor random range_ycor
-
-        while [[pcolor] of patch x_cor y_cor = turquoise] [
-          set y_cor random range_ycor
-        ]
-        set starting_cor list x_cor y_cor
+     relay_positions
+    ]
+    if any? turtles with [shape = "circle"] in-radius 2 and holding_obj = 0 [
+      ; make turtle move toward this object by using its coordinates but make it natural and
+      ; uses forward and turning and stuff like that
+      collect_obj
+    ]
+    ifelse holding_obj = 1 [
+      returning_hq
+      print "holding object"
+      if any? antisocial_agents in-radius 5 or any? relay_agents in-radius 5 [
+        communication_pulse 5
       ]
     ]
-    print "xcor"
-    print pxcor
-    print item 0 starting_cor
-
-    print "ycor"
-    print pycor
-    print item 1 starting_cor
-
-    if pycor != (item 1 starting_cor) or pxcor != (item 0 starting_cor) [
-      print "hello"
+    [if pycor != (item 1 starting_cor) or pxcor != (item 0 starting_cor) [
       facexy item 0 starting_cor item 1 starting_cor
       fd 1
     ]
-    if any? antisocial_agents in-radius 7 [
-      print "com_pulse"
+    if any? antisocial_agents in-radius 5 or any? relay_agents in-radius 5 [
       communication_pulse 7
       ]
+    ]
   ]
   ;tick
 end
@@ -243,6 +227,39 @@ to lhs
     ]
     ;; move forward
     fd 1
+end
+
+to relay_positions
+    let num_other_nodes num-antisocial-agents + num-social-agents
+    let x_cor 0
+    let y_cor 0
+    let range_ycor 0
+
+    ;y coordinates
+    if num-relay-agents < 5 [
+      set range_ycor max-pycor / 4
+    ]
+    if num-relay-agents < 10 and num-relay-agents > 4 [
+      set range_ycor max-pycor / 4 + random  max-pycor / 4
+    ]
+    if num-relay-agents < 15 and num-relay-agents > 10 [
+      set range_ycor max-pycor / 2 + random  max-pycor / 4
+    ]
+    set y_cor range_ycor
+
+    ;x coordinates
+    ;right middle
+    if (who - num_other_nodes) mod 4 = 1 [ set x_cor round (max-pxcor / 4) ]
+    ;left middle
+    if (who - num_other_nodes) mod 4 = 2 [ set x_cor round (min-pxcor / 4) ]
+    ;far right
+    if (who - num_other_nodes) mod 4 = 3 [ set x_cor round (max-pxcor / 4) * 3 ]
+    ;far left
+    if (who - num_other_nodes) mod 4 = 0 [ set x_cor round (min-pxcor / 4) * 3 ]
+    while [[pcolor] of patch x_cor y_cor = turquoise] [
+      set y_cor random range_ycor
+    ]
+    set starting_cor list x_cor y_cor
 end
 
 ; cite this work
@@ -279,10 +296,9 @@ end
 
 ; need to tailor the new collision avoidance so it works like the social agents around the green
 to collision_avoidance
-  show wall? 0 1
    ;; turn left if necessary (sometimes more than once)
   while [wall? 0 1] [
-    lt 90
+    lt -90
   ]
   ;; move forward
   fd 1
@@ -291,15 +307,13 @@ end
 to returning_hq
   ; print "Returning to the HQ"
   face target
-  ; let agent_type self
-  ; print [breed] of this_agent
+
   ; For when the agent is at the hq
   if distance target = 0 [
-    if breed = antisocial_agents [
+    if breed = antisocial_agents or breed = relay_agents[
       set holding_obj 0
       face patch 0 0
       random_walk
-      ; let this_agent self
       ask objects-here [
         die
       ]
@@ -330,9 +344,6 @@ to communication_pulse [r]
     ask antisocial_agents in-radius r [
       if self_obj_cor != 0 [
         if not member? self_obj_cor info_obj_cor[ set info_obj_cor lput self_obj_cor info_obj_cor ]
-        ;print "anti_yay"
-        ;print who
-        ;print info_obj_cor
       ]
     ]
   ]
@@ -340,6 +351,7 @@ to communication_pulse [r]
     ask relay_agents in-radius r [
       if self_obj_cor != 0 [
         if not member? self_obj_cor info_obj_cor[ set info_obj_cor lput self_obj_cor info_obj_cor ]
+        print "relay lets goo"
       ]
     ]
   ]
@@ -363,7 +375,7 @@ to-report average_obj_cor
       set xlist map [x -> item 0 x] info_obj_cor
       set ylist map [x -> item 1 x] info_obj_cor
 
-      report list mean xlist mean ylist
+      report list round mean xlist round mean ylist
     ]
   ]
   report []
@@ -503,7 +515,7 @@ num-relay-agents
 num-relay-agents
 0
 50
-3.0
+4.0
 1
 1
 NIL
