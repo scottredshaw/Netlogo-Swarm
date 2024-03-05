@@ -5,6 +5,10 @@ breed [objects object]
 
 breed [hqs hq]
 
+globals [
+  my-leader
+]
+
 patches-own [
   obstacles
 ]
@@ -22,11 +26,9 @@ relay_agents-own[
 
 antisocial_agents-own[]
 
-social_agents-own[]
-
-
-globals [
-  _
+social_agents-own[
+  leader
+  follower
 ]
 
 to setup
@@ -154,9 +156,10 @@ to go
     ; 5) when detects a wall turn right
 
     if num-social-agents > 0 [
-      if who = 1 [lhs]
-      if who = 2 [fd 1]
-      create-links-with other social_agents
+      print who
+      if who - num-antisocial-agents = 1 [ set leader true set my-leader self]
+      print my-leader
+      if who - num-antisocial-agents != 1 [ set follower true ]
     ]
 
     if any? turtles with [shape = "circle"] in-cone 2 90 and holding_obj = 0 [
@@ -171,7 +174,9 @@ to go
         communication_pulse 3
       ]
     ]
-    [lhs]
+    [if leader = true [lhs]
+     if follower = true and my-leader != 0 [follow_leader]
+    ]
 
   ]
   ask relay_agents [
@@ -205,6 +210,9 @@ to go
       ]
     ]
     [if pycor != (item 1 starting_cor) or pxcor != (item 0 starting_cor) [
+      if any? patches with [pcolor = turquoise] in-cone 2 90 [
+        collision_avoidance
+      ]
       facexy item 0 starting_cor item 1 starting_cor
       fd 1
     ]
@@ -271,6 +279,12 @@ to-report wall? [angle dis]  ;; turtle procedure
     report turquoise = [pcolor] of patch-right-and-ahead angle 1
   ]
   report false
+end
+
+to follow_leader
+  face my-leader
+  fd (distance my-leader) * (random-float 1) ; move towards leader...
+  ;rt random-normal 0 60 fd random-float 1 ; add a more random moving instead of just straight following
 end
 
 to collect_obj
@@ -500,7 +514,7 @@ num-social-agents
 num-social-agents
 0
 50
-1.0
+3.0
 1
 1
 NIL
