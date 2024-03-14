@@ -7,6 +7,7 @@ breed [hqs hq]
 
 globals [
   my-leader
+  start_time
 ]
 
 patches-own [
@@ -39,13 +40,14 @@ to setup
   clear-all
   setup-patches
   setup-agents
+  set start_time timer
   reset-ticks
 end
 
 to setup-patches
-  ask patches
-  [setup-obstacles
-  color-patch ]
+  ;ask patches
+  setup-obstacles
+  ;color-patch ]
   ask patches with [
     pxcor = max-pxcor or
     pxcor = min-pxcor or
@@ -108,24 +110,43 @@ to setup-obstacles
   ;]
 
   ; Chnage functionality to allow for a specified number of obstacles
-  let x random max-pxcor
-  let y random max-pycor
+  ;let x random max-pxcor
+  ;let y random max-pycor
   ; let counter 10
 
   ; while counter != 0 [
   ;  set obstacles (
   ;]
-  set obstacles (distancexy random-xcor (random (max-pycor - 1 ))) < 3
+  ;set obstacles (distancexy random-xcor (random (max-pycor - 1 ))) < 3
+
+ ;; Change this number to your desired count
+  ask n-of (num-obstacles - 5) patches with [pycor > 0 and (pycor < max-pycor - 1 or pxcor < max-pxcor - 1 or pycor < min-pycor + 1 or pxcor < min-pxcor + 1)] [
+    set pcolor turquoise
+    set obstacles 1
+  ]
+
+  ; build more obstacles around the edge
+  ask n-of 5 patches with [pycor < max-pycor - 1 and pycor > max-pycor - 3][
+    set pcolor turquoise
+    set obstacles 1
+  ]
 end
 
-to color-patch
-  if obstacles
-  [ set pcolor turquoise]
-end
+;to color-patch
+;  if obstacles = 1
+;  [ set pcolor turquoise]
+;end
 
 
 to go
-  let initial 0
+  ; when all the objects are collected
+  if count objects = 0 [
+    let total_time timer - start_time
+    output-print total_time
+    stop
+  ]
+
+
   ask antisocial_agents [
     ; print "antisocial"
     print info_obj_cor
@@ -137,17 +158,10 @@ to go
       ; 1 way - check coordinates and cross reference with all other agents
       ; 2 way - adding a counter to the object - but will need to go into the object class
       let obj_in_view min-one-of objects [distance myself]
-      ; if [xcor] of obj_in_view != [xcor] of any? turtles and [ycor] of obj_in_view != [ycor] of any? turtles [ collect_obj ]
-      if any? turtles with [ xcor != round [xcor] of obj_in_view and ycor != round [ycor] of obj_in_view][
-
-        ;print [xcor] of obj_in_view
-        ;print [ycor] of obj_in_view
-        ;print "agent cor"
-        ;print pxcor
-        ;print pycor
-        collect_obj ]
-      if any? turtles with [ xcor > round [xcor] of obj_in_view - 1 and xcor < round [xcor] of obj_in_view + 1 and ycor > round [ycor] of obj_in_view - 1 and ycor < round [ycor] of obj_in_view + 1][ collect_obj ]
-      ; [print "same coordinate"]
+      let if_collected [collected] of obj_in_view
+      if if_collected != true [
+        collect_obj
+      ]
     ]
 
     ifelse holding_obj = 1 [
@@ -174,7 +188,7 @@ to go
     ; 5) when detects a wall turn right
 
     if num-social-agents > 0 [
-      if my-leader = 0[if who - num-antisocial-agents = 1 [ set leader true set my-leader self]]
+      if my-leader = 0 [if who - num-antisocial-agents = 1 [ set leader true set my-leader self]]
       if who - num-antisocial-agents != 1 [ set follower true ]
     ]
 
@@ -182,9 +196,10 @@ to go
       ; make turtle move toward this object by using its coordinates but make it natural and
       ; uses forward and turning and stuff like that
       let obj_in_view min-one-of objects [distance myself]
-      ; if [xcor] of obj_in_view != [xcor] of any? turtles and [ycor] of obj_in_view != [ycor] of any? turtles [ collect_obj ]
-      if any? turtles with [ xcor > round [xcor] of obj_in_view - 1 and xcor < round [xcor] of obj_in_view + 1 and ycor > round [ycor] of obj_in_view - 1 and ycor < round [ycor] of obj_in_view + 1][ collect_obj ]
-      if any? turtles with [ xcor = round [xcor] of obj_in_view and ycor = round [ycor] of obj_in_view] [print "same coordinate"]
+      let if_collected [collected] of obj_in_view
+      if if_collected != true [
+        collect_obj
+      ]
     ]
     ; before it starts returning to the hq to change the leadership to another agent
     ifelse holding_obj = 1 [
@@ -233,10 +248,10 @@ to go
       ; make turtle move toward this object by using its coordinates but make it natural and
       ; uses forward and turning and stuff like that
       let obj_in_view min-one-of objects [distance myself]
-      ; potentially use a range to catch it but could cause problems depending on the size of the range
-      if any? turtles with [ xcor != round [xcor] of obj_in_view and ycor != round [ycor] of obj_in_view][ collect_obj ]
-      if any? turtles with [ xcor > round [xcor] of obj_in_view - 1 and xcor < round [xcor] of obj_in_view + 1 and ycor > round [ycor] of obj_in_view - 1 and ycor < round [ycor] of obj_in_view + 1][ collect_obj ]
-      if any? turtles with [ xcor = round [xcor] of obj_in_view and ycor = round [ycor] of obj_in_view] [print "same coordinate"]
+      let if_collected [collected] of obj_in_view
+      if if_collected != true [
+        collect_obj
+      ]
     ]
     ifelse holding_obj = 1 [
       returning_hq
@@ -563,7 +578,7 @@ num-antisocial-agents
 num-antisocial-agents
 0
 50
-2.0
+5.0
 1
 1
 NIL
@@ -598,6 +613,23 @@ num-relay-agents
 1
 NIL
 HORIZONTAL
+
+OUTPUT
+32
+278
+199
+321
+10
+
+CHOOSER
+45
+344
+183
+389
+num-obstacles
+num-obstacles
+0 10 20 30
+3
 
 @#$#@#$#@
 ## WHAT IS IT?
