@@ -24,6 +24,10 @@ relay_agents-own[
   starting_cor
 ]
 
+objects-own[
+  collected
+]
+
 antisocial_agents-own[]
 
 social_agents-own[
@@ -123,20 +127,31 @@ end
 to go
   let initial 0
   ask antisocial_agents [
-    print "antisocial"
+    ; print "antisocial"
     print info_obj_cor
     ; print who
     ; print info_obj_cor
 
     if any? turtles with [shape = "circle"] in-cone 2 90 and holding_obj = 0 [
-      ; make turtle move toward this object by using its coordinates but make it natural and
-      ; uses forward and turning and stuff like that
-      ; print "trying to collect"
-      collect_obj
+      ;Need to add a check to make sure an agent doesnt collect an object that is already being collected
+      ; 1 way - check coordinates and cross reference with all other agents
+      ; 2 way - adding a counter to the object - but will need to go into the object class
+      let obj_in_view min-one-of objects [distance myself]
+      ; if [xcor] of obj_in_view != [xcor] of any? turtles and [ycor] of obj_in_view != [ycor] of any? turtles [ collect_obj ]
+      if any? turtles with [ xcor != round [xcor] of obj_in_view and ycor != round [ycor] of obj_in_view][
+
+        ;print [xcor] of obj_in_view
+        ;print [ycor] of obj_in_view
+        ;print "agent cor"
+        ;print pxcor
+        ;print pycor
+        collect_obj ]
+      if any? turtles with [ xcor > round [xcor] of obj_in_view - 1 and xcor < round [xcor] of obj_in_view + 1 and ycor > round [ycor] of obj_in_view - 1 and ycor < round [ycor] of obj_in_view + 1][ collect_obj ]
+      ; [print "same coordinate"]
     ]
 
     ifelse holding_obj = 1 [
-      print "holding object"
+      ; print "holding object"
       ; print distance target
       if any? antisocial_agents in-radius 3 or any? relay_agents in-radius 3 [
         communication_pulse 3
@@ -148,6 +163,9 @@ to go
   ]
 
   ask social_agents [
+    print who
+    print "social"
+    print my-leader
     ; 1) create a lead agent
     ; 2) goes on the left most coordinate
     ; - go left till u hit a wall then go right
@@ -156,33 +174,47 @@ to go
     ; 5) when detects a wall turn right
 
     if num-social-agents > 0 [
-      print who
-      if who - num-antisocial-agents = 1 [ set leader true set my-leader self]
-      print my-leader
+      if my-leader = 0[if who - num-antisocial-agents = 1 [ set leader true set my-leader self]]
       if who - num-antisocial-agents != 1 [ set follower true ]
     ]
 
     if any? turtles with [shape = "circle"] in-cone 2 90 and holding_obj = 0 [
       ; make turtle move toward this object by using its coordinates but make it natural and
       ; uses forward and turning and stuff like that
-      collect_obj
+      let obj_in_view min-one-of objects [distance myself]
+      ; if [xcor] of obj_in_view != [xcor] of any? turtles and [ycor] of obj_in_view != [ycor] of any? turtles [ collect_obj ]
+      if any? turtles with [ xcor > round [xcor] of obj_in_view - 1 and xcor < round [xcor] of obj_in_view + 1 and ycor > round [ycor] of obj_in_view - 1 and ycor < round [ycor] of obj_in_view + 1][ collect_obj ]
+      if any? turtles with [ xcor = round [xcor] of obj_in_view and ycor = round [ycor] of obj_in_view] [print "same coordinate"]
     ]
+    ; before it starts returning to the hq to change the leadership to another agent
     ifelse holding_obj = 1 [
+      if my-leader = self [ new_leader ]
       returning_hq
       print "holding object"
       if any? antisocial_agents in-radius 3 or any? relay_agents in-radius 3 [
         communication_pulse 3
       ]
     ]
-    [if leader = true [lhs]
-     if follower = true and my-leader != 0 [follow_leader]
+    [if leader = true and my-leader = self[
+      print "lhs"
+      if heading mod 90 != 0 [
+        if pycor > max-pycor - 4 [set heading 90]
+        if pycor < min-pycor + 4 [set heading 270]
+        if pxcor > max-pxcor - 4 [set heading 180]
+        if pxcor < min-pycor + 4 [set heading 0]
+      ]
+      lhs
+     ]
+     if follower = true and my-leader != 0 and my-leader != self [
+        print "follow leader"
+        follow_leader]
     ]
-
   ]
+
   ask relay_agents [
-    print "relay"
-    print info_obj_cor
-    print starting_cor
+    ;print "relay"
+    ;print info_obj_cor
+    ;print starting_cor
 
     ; loiter around the middle of the environment and stayw within a range of the middle 40 percent
     ; keeps track of information given via the other agents
@@ -197,14 +229,18 @@ to go
     if length starting_cor = 0 [
      relay_positions
     ]
-    if any? turtles with [shape = "circle"] in-radius 2 and holding_obj = 0 [
+    if any? turtles with [shape = "circle"] in-radius 3 and holding_obj = 0 [
       ; make turtle move toward this object by using its coordinates but make it natural and
       ; uses forward and turning and stuff like that
-      collect_obj
+      let obj_in_view min-one-of objects [distance myself]
+      ; potentially use a range to catch it but could cause problems depending on the size of the range
+      if any? turtles with [ xcor != round [xcor] of obj_in_view and ycor != round [ycor] of obj_in_view][ collect_obj ]
+      if any? turtles with [ xcor > round [xcor] of obj_in_view - 1 and xcor < round [xcor] of obj_in_view + 1 and ycor > round [ycor] of obj_in_view - 1 and ycor < round [ycor] of obj_in_view + 1][ collect_obj ]
+      if any? turtles with [ xcor = round [xcor] of obj_in_view and ycor = round [ycor] of obj_in_view] [print "same coordinate"]
     ]
     ifelse holding_obj = 1 [
       returning_hq
-      print "holding object"
+      ;print "holding object"
       if any? antisocial_agents in-radius 5 or any? relay_agents in-radius 5 [
         communication_pulse 5
       ]
@@ -217,11 +253,31 @@ to go
       fd 1
     ]
     if any? antisocial_agents in-radius 5 or any? relay_agents in-radius 5 [
-      communication_pulse 7
+      communication_pulse 5
       ]
     ]
   ]
   ;tick
+end
+
+to new_leader
+  ; set leader false on the current one
+  ; set leader true on the new one
+  print my-leader
+  set my-leader 0
+  set leader false
+  print "yes changing leader"
+  ; instead of one of need to do one that says one not holding object
+  let other-agent one-of other social_agents
+  if other-agent != nobody [
+   ask other-agent [
+     print self
+     set leader true
+     set my-leader self
+   ]
+  ]
+  set follower true
+  print my-leader
 end
 
 to lhs
@@ -283,18 +339,26 @@ end
 
 to follow_leader
   face my-leader
-  fd (distance my-leader) * (random-float 1) ; move towards leader...
-  ;rt random-normal 0 60 fd random-float 1 ; add a more random moving instead of just straight following
+  fd (distance my-leader) * (random-float 0.7) ; move towards leader...
+  let rand_ang random-normal 0 60
+  let rand_fd random-float 0.7
+  if not wall? rand_ang rand_fd [
+    rt rand_ang fd rand_fd
+  ]
+  ; add a more random moving instead of just straight following
 end
 
 to collect_obj
   ; this would only work
+  print "collecting"
   move-to min-one-of objects [distance myself]
   let this_agent self
+  let obj_in_view min-one-of objects [distance myself]
   ; need to do this when it is on top of it
   ; when it is on top of it stop
   ask objects-here [
     set color red
+    set collected true
     let agent_type [ breed ] of this_agent
     create-links-with agent_type in-radius 1 [
       tie
@@ -365,7 +429,7 @@ to communication_pulse [r]
     ask relay_agents in-radius r [
       if self_obj_cor != 0 [
         if not member? self_obj_cor info_obj_cor[ set info_obj_cor lput self_obj_cor info_obj_cor ]
-        print "relay lets goo"
+        ;print "relay lets goo"
       ]
     ]
   ]
@@ -529,7 +593,7 @@ num-relay-agents
 num-relay-agents
 0
 50
-4.0
+3.0
 1
 1
 NIL
